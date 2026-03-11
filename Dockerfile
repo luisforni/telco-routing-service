@@ -1,15 +1,15 @@
-FROM golang:1.24-bookworm AS builder
-WORKDIR /app
-COPY go.mod go.sum* ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o routing .
+FROM python:3.11-slim
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=builder /app/routing .
-EXPOSE 8080
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8007
+
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:8080/healthz || exit 1
-ENTRYPOINT ["./routing"]
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8007/healthz')" || exit 1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8007"]
